@@ -1,32 +1,31 @@
 const { exec } = require("child_process");
 const path = require("path");
 const fs = require("fs");
-const AWS = require("aws-sdk");
+const {PutObjectCommand, S3Client} = require('@aws-sdk/client-s3')
 const mime = require("mime-types");
 
 const PROJECT_ID = process.env.PROJECT_ID;
 
-// Configure Backblaze B2
-const s3 = new AWS.S3({
-  endpoint: "https://s3.us-east-005.backblazeb2.com",
-  accessKeyId: "005b82fd142a4150000000001",
-  secretAccessKey: "K005Jxogr9WrniRYmFmzoDztpsX1nuc",
-  region: 'us-east-005',
-  signatureVersion: 'v4'
-});
+const s3Client = new S3Client({
+  region: "ap-south-1",
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey : process.env.AWS_SECRET_ACCESS_KEY,
+  }
+})
 
-async function uploadFileToB2( filePath, fileKey) {
+async function uploadFileToS3( filePath, fileKey) {
   const fileStream = fs.createReadStream(filePath);
   const contentType = mime.lookup(filePath) || "application/octet-stream";
 
-  return s3
-    .upload({
-      Bucket: "vercel-bucket",
-      Key: fileKey,
-      Body: fileStream,
-      ContentType: contentType,
-    })
-    .promise();
+  const command = new PutObjectCommand({
+    Bucket: "anuj-vercel-bucket",
+    Key: fileKey,
+    Body: fileStream,
+    ContentType: contentType,
+  })
+
+  return s3Client.send(command);
 }
 
 async function init() {
@@ -39,9 +38,10 @@ async function init() {
     console.log(data.toString());
   });
 
-  p.stdout.on("error", function (data) {
+  p.stderr.on("data", function (data) {
     console.error(data.toString());
   });
+
 
   p.on("close", async function () {
     console.log(`Build Completed`);
@@ -55,18 +55,18 @@ async function init() {
       // Skip if it's a directory
       if (fs.lstatSync(filePath).isDirectory()) continue;
 
-      const fileKey = `__outputs/${PROJECT_ID}/${fileName}`; // Customize path in B2
+      const fileKey = `__outputs/${PROJECT_ID}/${fileName}`; // Customize path in S3
 
       try {
-        console.log("Trying to upload file...")
-        await uploadFileToB2(filePath, fileKey);
-        console.log(`Uploaded ${fileName} to Backblaze B2 as ${fileKey}`);
+        console.log("Trying to upload file ", fileName);
+        await uploadFileToS3(filePath, fileKey);
+        console.log(`Uploaded ${fileName} to AWS S3 as ${fileKey}`);
       } catch (err) {
         console.error(`Error uploading ${fileName}:`, err);
       }
     }
 
-    console.log("All files uploaded to Backblaze B2");
+    console.log("All files uploaded to AWS S3");
   });
 }
 
