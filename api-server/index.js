@@ -5,7 +5,6 @@ const {ECSClient, RunTaskCommand} = require('@aws-sdk/client-ecs')
 
 const app = express();
 const PORT = process.env.PORT | 9000;
-
 doetenv.config();
 
 const ecsClient = new ECSClient({
