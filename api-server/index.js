@@ -1,11 +1,33 @@
 const express = require('express');
-const doetenv = require('dotenv');
+const dotenv = require('dotenv');
+const {Server} = require('socket.io');
+const Redis = require('ioredis');
 const {generateSlug} = require('random-word-slugs');
 const {ECSClient, RunTaskCommand} = require('@aws-sdk/client-ecs')
+const cors = require('cors');
+
+dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT | 9000;
-doetenv.config();
+app.use(cors());
+
+const PORT = process.env.PORT || 9000;
+
+const subscriber = new Redis(process.env.REDIS_URL);
+
+subscriber.on('error', (err) => {
+    console.error('Redis connection error:', err);
+});
+
+const io = new Server({ cors: "*" });
+
+io.on('connection', (socket) => {
+    console.log('Client connected');
+    socket.on('subscribe', (channel) => {
+        socket.join(channel);
+        socket.emit('message', `Joined ${channel}`);
+    });
+});
 
 const ecsClient = new ECSClient({
     region:"ap-south-1",
@@ -23,8 +45,8 @@ const config = {
 app.use(express.json());
 
 app.post('/project', async(req,res)=>{
-    const {gitURL} = req.body;
-    const slug = generateSlug();
+    const {gitURL, userSlug} = req.body;
+    const slug = userSlug ? userSlug :  generateSlug();
 
     const command = new RunTaskCommand({
         cluster: config.CLUSTER,
@@ -60,6 +82,19 @@ app.post('/project', async(req,res)=>{
     await ecsClient.send(command);
 
     return res.json({ status : "queued", data : {slug, url : `http://${slug}.localhost:8000`} });
+});
+
+async function handleRedisSubscribe() {
+    console.log('Subscribing to logs');
+    subscriber.psubscribe('logs:*');
+    subscriber.on('pmessage', (pattern, channel, message) => {
+        io.to(channel).emit('message', message);
+    });
+}
+handleRedisSubscribe();
+
+io.listen(9002, ()=>{
+    console.log('Socket server is running on port 9002');
 });
 
 app.listen(PORT, () => {  
