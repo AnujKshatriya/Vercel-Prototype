@@ -82,6 +82,7 @@ app.post("/project", async (req, res) => {
   return res.json({ status: "success", data: { project } });
 });
 
+
 app.post("/deploy", async (req, res) => {
   const { projectId } = req.body;
 
@@ -142,6 +143,42 @@ app.post("/deploy", async (req, res) => {
     data: { deploymentId : deployment.id },
   });
 });
+
+
+app.get('/logs/:id', async (req, res) => {
+  const id = req.params.id;
+  const logs = await client.query({
+      query: `SELECT event_id, deployment_id, log, timestamp from log_events where deployment_id = {deployment_id:String}`,
+      query_params: {
+          deployment_id: id
+      },
+      format: 'JSONEachRow'
+  })
+
+  const rawLogs = await logs.json()
+
+  return res.json({ logs: rawLogs })
+})
+
+app.get("/getProjectId", async (req, res) => {
+  const { subdomain } = req.query;
+
+  if (!subdomain) return res.status(400).json({ error: "Subdomain is required" });
+
+  try {
+    const project = await prisma.project.findFirst({
+      where: { subdomain: subdomain.toString() },
+    });
+
+    if (!project) return res.status(404).json({ error: "Project not found" });
+
+    return res.status(200).json({ projectId: project.id });
+  } catch (error) {
+    console.error("Database error:", error);
+    return res.status(500).json({ error: "Database error" });
+  }
+});
+
 
 async function initKafkaConsumer() {
   await consumer.connect();
