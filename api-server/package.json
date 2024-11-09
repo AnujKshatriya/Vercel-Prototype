@@ -11,11 +11,18 @@
   "license": "ISC",
   "dependencies": {
     "@aws-sdk/client-ecs": "^3.683.0",
+    "@clickhouse/client": "^1.8.0",
+    "@prisma/client": "^5.22.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
-    "ioredis": "^5.4.1",
+    "kafkajs": "^2.2.4",
     "random-word-slugs": "^0.1.7",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "uuid": "^11.0.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0"
   }
 }
